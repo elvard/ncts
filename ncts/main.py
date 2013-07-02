@@ -81,6 +81,7 @@ class TaskSpoolerGui(object):
         self.ts = TaskSpooler()
 
         self.create_layout()
+        self.calculate_dimensions()
         self.run()
 
     def run(self):
@@ -104,6 +105,19 @@ class TaskSpoolerGui(object):
 
         return max(1, min(self.max_tasks, nextLineNum))
 
+    def calculate_dimensions(self):
+        height, width = self.screen.getmaxyx()
+        self.screen_width = width
+        self.ts_list_height = max(5, int(0.4 * height))
+        self.ts_output_height = max(0, height - self.ts_list_height)
+
+        height, width = self.tsPad.getmaxyx()
+        if self.screen_width > width:
+            self.tsPad.resize(height, self.screen_width)
+        height, width = self.outputPad.getmaxyx()
+        if self.screen_width > width:
+            self.outputPad.resize(height, self.screen_width)
+
     def create_layout(self):
         # Normal
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
@@ -120,8 +134,7 @@ class TaskSpoolerGui(object):
 
         self.selected_task = None
         self.tsPad = curses.newpad(self.MAX_LINES, 80)
-        self.outputPad = curses.newpad(self.MAX_LINES, 120)
-        self.outputPad.move(20, 0)
+        self.outputPad = curses.newpad(self.MAX_LINES, 80)
 
     def display_screen(self):
         self.ts.read_task_list()
@@ -136,7 +149,7 @@ class TaskSpoolerGui(object):
             max_line = max(max_line, len(task['line']))
 
         self.max_tasks = y
-        self.tsPad.refresh(0, 0, 0, 0, y, max_line)
+        self.tsPad.refresh(0, 0, 0, 0, y, self.screen_width)
 
         self.display_task_output()
 
@@ -153,7 +166,9 @@ class TaskSpoolerGui(object):
                 for y, line in enumerate(output):
                     self.outputPad.addstr(y, 0, line)
                     max_line = max(max_line, len(line))
-                self.outputPad.refresh(0, 0, 20, 0, 60, 80)
+
+                self.outputPad.refresh(0, 0, self.ts_list_height + 1,
+                                0, self.ts_output_height, self.screen_width)
         except IOError:
             return
 
