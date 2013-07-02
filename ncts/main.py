@@ -7,7 +7,6 @@ import locale
 import operator as O
 import threading
 from collections import OrderedDict
-from datetime import datetime
 
 locale.setlocale(locale.LC_ALL, '')
 code = locale.getpreferredencoding()
@@ -32,7 +31,7 @@ class PeriodicTimer(object):
     def start(self):
         self.thread = threading.Timer(self.interval, self.callback,
                                       args=self.args, kwargs=self.kwargs)
-        #self.thread.start()
+        self.thread.start()
 
     def cancel(self):
         self.thread.cancel()
@@ -118,7 +117,10 @@ class Box(object):
         box_width = max(self.width, TaskSpoolerGui.screen_width) - 1
         box_height = max(self.height, TaskSpoolerGui.screen_height)
 
-        self.pad.noutrefresh(0, 0, self.y, self.x, box_height, box_width)
+        self.window.box()
+        self.window.noutrefresh()
+        self.pad.overlay(self.window)
+        self.pad.noutrefresh(0, 0, self.y + 1, self.x + 1, box_height - 1, box_width - 1)
 
     def resize(self, new_height, new_width):
         self.height, self.width = new_height, new_width
@@ -130,7 +132,7 @@ class Box(object):
 
     def move(self, y, x):
         self.y, self.x = y, x
-        self.window.move(y, x)
+        self.window.mvwin(y, x)
 
 
 class TaskSpoolerGui(object):
@@ -144,6 +146,7 @@ class TaskSpoolerGui(object):
     def __init__(self, screen):
         curses.curs_set(0)
         self.screen = screen
+        self.screen.refresh()
 
         self.ts = TaskSpooler()
 
@@ -157,7 +160,6 @@ class TaskSpoolerGui(object):
         curses.curs_set(1)
 
     def run(self):
-        self.screen.refresh()
         self.timer = PeriodicTimer(0.5, self.redraw)
         self.timer.start()
 
@@ -188,8 +190,6 @@ class TaskSpoolerGui(object):
         self.calculate_dimensions()
         self.display_screen()
         self.display_task_output(self.selected_task)
-        self.screen.addstr(0, 0, datetime.now().isoformat())
-        #self.screen.noutrefresh()
         curses.doupdate()
 
     def calculate_dimensions(self):
@@ -235,18 +235,18 @@ class TaskSpoolerGui(object):
         self.ts.read_task_list()
         self.max_tasks = len(self.ts.tasks)
 
-        self.box_ts_list.pad.addstr(self.ts.header, curses.A_BOLD)
-        max_line = len(self.ts.header)
+        self.box_ts_list.pad.addstr(0, 0, self.ts.header, curses.A_BOLD)
 
         for y, task_tuple in enumerate(self.ts.tasks.items(), 1):
             id_, task = task_tuple
             color = self.get_highlight(y, task['state'], task['elevel'])
             self.box_ts_list.pad.addstr(y, 0, task['line'], color)
-            max_line = max(max_line, len(task['line']))
 
         self.box_ts_list.draw()
 
     def display_task_output(self, task_index=None):
+        self.box_output.pad.clear()
+
         tasks = list(self.ts.tasks.values())
         if not tasks:
             return
@@ -254,7 +254,6 @@ class TaskSpoolerGui(object):
             task = tasks[0]
         else:
             task = tasks[task_index - 1]
-        self.box_output.pad.clear()
 
         try:
             with open(task['output'], 'r') as output:
@@ -284,7 +283,10 @@ class TaskSpoolerGui(object):
 
     def remove_task(self, task_index=None):
         if task_index:
-            task_index = list(self.ts.tasks.keys())[task_index - 1]
+            try:
+                task_index = list(self.ts.tasks.keys())[task_index - 1]
+            except IndexError:
+                return
         self.ts.remove_task(task_index)
 
 
