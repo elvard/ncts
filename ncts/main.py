@@ -13,13 +13,6 @@ code = locale.getpreferredencoding()
 
 decode = lambda b: b.decode(code)
 
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-log_handler = logging.FileHandler('ncts.log')
-log_handler.setLevel(logging.DEBUG)
-log_handler.setFormatter(formatter)
-logger = logging.getLogger('ncts')
-logger.addHandler(log_handler)
-
 
 class TaskSpooler(object):
     command = 'tsp'
