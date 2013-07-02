@@ -256,13 +256,10 @@ class TaskSpoolerGui(object):
             task = tasks[task_index - 1]
         self.box_output.pad.clear()
 
-        max_line = 0
         try:
             with open(task['output'], 'r') as output:
-                y = 0
                 for y, line in enumerate(output):
                     self.box_output.pad.addstr(y, 0, line)
-                    max_line = max(max_line, len(line))
 
         except IOError:
             return
