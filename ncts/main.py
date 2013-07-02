@@ -32,7 +32,7 @@ class PeriodicTimer(object):
     def start(self):
         self.thread = threading.Timer(self.interval, self.callback,
                                       args=self.args, kwargs=self.kwargs)
-        self.thread.start()
+        #self.thread.start()
 
     def cancel(self):
         self.thread.cancel()
@@ -40,9 +40,16 @@ class PeriodicTimer(object):
 
 class TaskSpooler(object):
     command = 'tsp'
+    remove_args = '-r'
 
     def get_command(self, command):
         return subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+
+    def remove_task(self, id=None):
+        command = [self.command, self.remove_args]
+        if id is not None:
+            command.append(id)
+        subprocess.call(command)
 
     @property
     def tasks(self):
@@ -65,7 +72,7 @@ class TaskSpooler(object):
                                          key=func))
 
     def read_task_list(self):
-        cmd = self.get_command(self.command)
+        cmd = self.get_command([self.command])
 
         self._tasks = {}
         self.header = decode(next(cmd.stdout))
@@ -146,6 +153,7 @@ class TaskSpoolerGui(object):
         self.run()
 
     def __del__(self):
+        self.timer.cancel()
         curses.curs_set(1)
 
     def run(self):
@@ -163,6 +171,8 @@ class TaskSpoolerGui(object):
                 self.selected_task = self.updown(self.DOWN)
             elif c == self.ESC_KEY:
                 self.remove_highlight()
+            elif c in (ord('d'), ord('D')):
+                self.remove_task(self.selected_task)
             elif c in (ord('q'), ord('Q')):
                 break
 
@@ -171,14 +181,13 @@ class TaskSpoolerGui(object):
     def updown(self, inc):
         if not self.selected_task:
             self.selected_task = 0
-        nextLineNum = self.selected_task + inc
 
-        return max(1, min(self.max_tasks, nextLineNum))
+        return max(1, min(self.max_tasks, self.selected_task + inc))
 
     def redraw(self):
         self.calculate_dimensions()
         self.display_screen()
-        self.display_task_output()
+        self.display_task_output(self.selected_task)
         self.screen.addstr(0, 0, datetime.now().isoformat())
         #self.screen.noutrefresh()
         curses.doupdate()
@@ -237,12 +246,14 @@ class TaskSpoolerGui(object):
 
         self.box_ts_list.draw()
 
-    def display_task_output(self):
+    def display_task_output(self, task_index=None):
         tasks = list(self.ts.tasks.values())
-        if not self.selected_task:
+        if not tasks:
+            return
+        if not task_index:
             task = tasks[0]
         else:
-            task = tasks[self.selected_task - 1]
+            task = tasks[task_index - 1]
         self.box_output.pad.clear()
 
         max_line = 0
@@ -273,6 +284,11 @@ class TaskSpoolerGui(object):
 
     def remove_highlight(self):
         self.selected_task = None
+
+    def remove_task(self, task_index=None):
+        if task_index:
+            task_index = list(self.ts.tasks.keys())[task_index - 1]
+        self.ts.remove_task(task_index)
 
 
 if __name__ == '__main__':
