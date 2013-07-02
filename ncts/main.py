@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import curses
+import curses.textpad
 import subprocess
 import locale
 import operator as O
@@ -91,7 +92,7 @@ class TaskSpoolerGui(object):
                 self.selected_task = self.updown(self.UP)
             elif c == curses.KEY_DOWN:
                 self.selected_task = self.updown(self.DOWN)
-            elif c in (self.ESC_KEY, ord('q'), ord('Q')):
+            elif c in (ord('q'), ord('Q')):
                 break
 
     def updown(self, inc):
