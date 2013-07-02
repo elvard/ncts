@@ -91,7 +91,7 @@ class TaskSpoolerGui(object):
                 self.selected_task = self.updown(self.UP)
             elif c == curses.KEY_DOWN:
                 self.selected_task = self.updown(self.DOWN)
-            elif c == self.ESC_KEY:
+            elif c in (self.ESC_KEY, ord('q'), ord('Q')):
                 break
 
     def updown(self, inc):
