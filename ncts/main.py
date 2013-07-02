@@ -118,6 +118,7 @@ class TaskSpoolerGui(object):
     ESC_KEY = 27
 
     def __init__(self, screen):
+        curses.curs_set(0)
         self.screen = screen
 
         self.ts = TaskSpooler()
@@ -127,7 +128,12 @@ class TaskSpoolerGui(object):
         self.calculate_dimensions()
         self.run()
 
+    def __del__(self):
+        curses.curs_set(1)
+
     def run(self):
+        self.screen.refresh()
+
         while True:
             self.redraw()
 
