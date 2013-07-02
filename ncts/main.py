@@ -161,10 +161,12 @@ class TaskSpoolerGui(object):
         self.tsPad.refresh(0, 0, 0, 0, self.ts_list_height, self.screen_width - 1)
 
     def display_task_output(self):
+        tasks = list(self.ts.tasks.values())
         if not self.selected_task:
-            return
+            task = tasks[0]
+        else:
+            task = tasks[self.selected_task - 1]
         self.outputPad.clear()
-        task = list(self.ts.tasks.values())[self.selected_task - 1]
 
         max_line = 0
         try:
