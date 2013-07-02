@@ -120,7 +120,8 @@ class TaskSpoolerGui(object):
 
         self.selected_task = None
         self.tsPad = curses.newpad(self.MAX_LINES, 80)
-        self.outputPad = curses.newpad(self.MAX_LINES, 80)
+        self.outputPad = curses.newpad(self.MAX_LINES, 120)
+        self.outputPad.move(20, 0)
 
     def display_screen(self):
         self.ts.read_task_list()
@@ -136,6 +137,25 @@ class TaskSpoolerGui(object):
 
         self.max_tasks = y
         self.tsPad.refresh(0, 0, 0, 0, y, max_line)
+
+        self.display_task_output()
+
+    def display_task_output(self):
+        if not self.selected_task:
+            return
+        self.outputPad.clear()
+        task = list(self.ts.tasks.values())[self.selected_task - 1]
+
+        max_line = 0
+        try:
+            with open(task['output'], 'r') as output:
+                y = 0
+                for y, line in enumerate(output):
+                    self.outputPad.addstr(y, 0, line)
+                    max_line = max(max_line, len(line))
+                self.outputPad.refresh(0, 0, 20, 0, 60, 80)
+        except IOError:
+            return
 
     def get_highlight(self, line_num, state, elevel):
         if state == 'running':
