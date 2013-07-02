@@ -274,9 +274,6 @@ class TaskSpoolerGui(object):
     def remove_highlight(self):
         self.selected_task = None
 
-    def exit(self):
-        pass
-
 
 if __name__ == '__main__':
     curses.wrapper(TaskSpoolerGui)
