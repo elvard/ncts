@@ -1,15 +1,41 @@
 #!/usr/bin/env python3
 import curses
 import curses.textpad
+import functools
 import subprocess
 import locale
 import operator as O
+import threading
 from collections import OrderedDict
+from datetime import datetime
 
 locale.setlocale(locale.LC_ALL, '')
 code = locale.getpreferredencoding()
 
 decode = lambda b: b.decode(code)
+
+
+class PeriodicTimer(object):
+    def __init__(self, interval, callback, args=[], kwargs={}):
+        self.interval = interval
+
+        @functools.wraps(callback)
+        def wrapper(*args, **kwargs):
+            result = callback(*args, **kwargs)
+            self.thread = threading.Timer(self.interval, self.callback,
+                                      args=self.args, kwargs=self.kwargs)
+            self.thread.start()
+
+        self.callback = wrapper
+        self.args, self.kwargs = args, kwargs
+
+    def start(self):
+        self.thread = threading.Timer(self.interval, self.callback,
+                                      args=self.args, kwargs=self.kwargs)
+        self.thread.start()
+
+    def cancel(self):
+        self.thread.cancel()
 
 
 class TaskSpooler(object):
@@ -27,7 +53,7 @@ class TaskSpooler(object):
             key = 'id'
 
         if key == 'id':
-            func = lambda t: t[0]
+            func = lambda t: int(t[0])
         elif key == 'state':
             state_level = {'running': 1, 'queued': 2}
             getter = lambda t: O.itemgetter(key)(t[1])
@@ -48,7 +74,7 @@ class TaskSpooler(object):
             id_, task = self._parse_task(decode(line))
             self._tasks[id_] = task
 
-        self.order_tasks('state')
+        self.order_tasks('id', reverse=True)
 
     def _parse_task(self, line):
         id_, state, output, rest = line.split(None, 3)
@@ -124,6 +150,8 @@ class TaskSpoolerGui(object):
 
     def run(self):
         self.screen.refresh()
+        self.timer = PeriodicTimer(0.5, self.redraw)
+        self.timer.start()
 
         while True:
             self.redraw()
@@ -138,6 +166,8 @@ class TaskSpoolerGui(object):
             elif c in (ord('q'), ord('Q')):
                 break
 
+        self.timer.cancel()
+
     def updown(self, inc):
         if not self.selected_task:
             self.selected_task = 0
@@ -149,6 +179,8 @@ class TaskSpoolerGui(object):
         self.calculate_dimensions()
         self.display_screen()
         self.display_task_output()
+        self.screen.addstr(0, 0, datetime.now().isoformat())
+        #self.screen.noutrefresh()
         curses.doupdate()
 
     def calculate_dimensions(self):
@@ -162,8 +194,9 @@ class TaskSpoolerGui(object):
 
         ts_list_height = max(5, int(0.4 * height))
         self.box_ts_list.resize(ts_list_height, self.screen_width)
+        self.box_ts_list.move(1, 0)
 
-        output_height = max(0, height - ts_list_height)
+        output_height = max(0, height - ts_list_height - 1)
         self.box_output.resize(output_height, self.screen_width)
         self.box_output.move(ts_list_height + 1, 0)
 
