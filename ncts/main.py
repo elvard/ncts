@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
+import sys
 import curses
 import curses.textpad
 import subprocess
 import locale
 import operator as O
+import logging
 from collections import OrderedDict
 
 locale.setlocale(locale.LC_ALL, '')
 code = locale.getpreferredencoding()
 
 decode = lambda b: b.decode(code)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_handler = logging.FileHandler('ncts.log')
+log_handler.setLevel(logging.DEBUG)
+log_handler.setFormatter(formatter)
+logger = logging.getLogger('ncts')
+logger.addHandler(log_handler)
 
 
 class TaskSpooler(object):
@@ -69,7 +78,39 @@ class TaskSpooler(object):
         }
 
 
+class Box(object):
+    def __init__(self, y=0, x=0, height=None, width=None):
+        if width and height:
+            self.window = curses.newwin(height, width, y, x)
+        else:
+            self.window = curses.newwin(y, x)
+        self.y, self.x = y, x
+        self.height, self.width = self.window.getmaxyx()
+
+    def add_pad(self, height=0, width=0):
+        self.pad = curses.newpad(height, width)
+
+    def draw(self):
+        box_width = max(self.width, TaskSpoolerGui.screen_width) - 1
+        box_height = max(self.height, TaskSpoolerGui.screen_height)
+
+        self.pad.noutrefresh(0, 0, self.y, self.x, box_height, box_width)
+
+    def resize(self, new_height, new_width):
+        self.height, self.width = new_height, new_width
+        self.window.resize(new_height, new_width)
+
+        height, width = self.pad.getmaxyx()
+        if width < self.width:
+            self.pad.resize(height, new_width)
+
+    def move(self, y, x):
+        self.y, self.x = y, x
+        self.window.move(y, x)
+
+
 class TaskSpoolerGui(object):
+    screen_width = screen_height = 0
     MAX_LINES = 500
 
     DOWN = 1
@@ -78,18 +119,17 @@ class TaskSpoolerGui(object):
 
     def __init__(self, screen):
         self.screen = screen
-        self.screen_width = self.screen_height = 0
 
         self.ts = TaskSpooler()
 
+        self.create_colours()
         self.create_layout()
+        self.calculate_dimensions()
         self.run()
 
     def run(self):
         while True:
-            self.calculate_dimensions()
-            self.display_screen()
-            self.display_task_output()
+            self.redraw()
 
             c = self.screen.getch()
             if c == curses.KEY_UP:
@@ -108,6 +148,12 @@ class TaskSpoolerGui(object):
 
         return max(1, min(self.max_tasks, nextLineNum))
 
+    def redraw(self):
+        self.calculate_dimensions()
+        self.display_screen()
+        self.display_task_output()
+        curses.doupdate()
+
     def calculate_dimensions(self):
         height, width = self.screen.getmaxyx()
         if height != self.screen_height or width != self.screen_width:
@@ -117,17 +163,14 @@ class TaskSpoolerGui(object):
 
         self.screen_height, self.screen_width = height, width
 
-        self.ts_list_height = max(5, int(0.4 * height))
-        self.ts_output_height = max(0, height - self.ts_list_height)
+        ts_list_height = max(5, int(0.4 * height))
+        self.box_ts_list.resize(ts_list_height, self.screen_width)
 
-        height, width = self.tsPad.getmaxyx()
-        if self.screen_width > width:
-            self.tsPad.resize(height, self.screen_width)
-        height, width = self.outputPad.getmaxyx()
-        if self.screen_width > width:
-            self.outputPad.resize(height, self.screen_width)
+        output_height = max(0, height - ts_list_height)
+        self.box_output.resize(output_height, self.screen_width)
+        self.box_output.move(ts_list_height + 1, 0)
 
-    def create_layout(self):
+    def create_colours(self):
         # Normal
         curses.init_pair(1, curses.COLOR_WHITE, curses.COLOR_BLACK)
         curses.init_pair(2, curses.COLOR_BLACK, curses.COLOR_WHITE)
@@ -141,24 +184,28 @@ class TaskSpoolerGui(object):
         curses.init_pair(7, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_GREEN)
 
+    def create_layout(self):
         self.selected_task = None
-        self.tsPad = curses.newpad(self.MAX_LINES, 80)
-        self.outputPad = curses.newpad(self.MAX_LINES, 80)
+        self.box_ts_list = Box()
+        self.box_ts_list.add_pad(self.MAX_LINES, 80)
+
+        self.box_output = Box()
+        self.box_output.add_pad(self.MAX_LINES, 80)
 
     def display_screen(self):
         self.ts.read_task_list()
         self.max_tasks = len(self.ts.tasks)
 
-        self.tsPad.addstr(self.ts.header, curses.A_BOLD)
+        self.box_ts_list.pad.addstr(self.ts.header, curses.A_BOLD)
         max_line = len(self.ts.header)
 
         for y, task_tuple in enumerate(self.ts.tasks.items(), 1):
             id_, task = task_tuple
             color = self.get_highlight(y, task['state'], task['elevel'])
-            self.tsPad.addstr(y, 0, task['line'], color)
+            self.box_ts_list.pad.addstr(y, 0, task['line'], color)
             max_line = max(max_line, len(task['line']))
 
-        self.tsPad.refresh(0, 0, 0, 0, self.ts_list_height, self.screen_width - 1)
+        self.box_ts_list.draw()
 
     def display_task_output(self):
         tasks = list(self.ts.tasks.values())
@@ -166,20 +213,20 @@ class TaskSpoolerGui(object):
             task = tasks[0]
         else:
             task = tasks[self.selected_task - 1]
-        self.outputPad.clear()
+        self.box_output.pad.clear()
 
         max_line = 0
         try:
             with open(task['output'], 'r') as output:
                 y = 0
                 for y, line in enumerate(output):
-                    self.outputPad.addstr(y, 0, line)
+                    self.box_output.pad.addstr(y, 0, line)
                     max_line = max(max_line, len(line))
 
-                self.outputPad.refresh(0, 0, self.ts_list_height + 1,
-                                0, self.ts_output_height, self.screen_width - 1)
         except IOError:
             return
+
+        self.box_output.draw()
 
     def get_highlight(self, line_num, state, elevel):
         if state == 'running':
