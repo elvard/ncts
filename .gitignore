@@ -1,2 +1,4 @@
 *.py[oc]
 __cache__
+
+*.sublime-*
