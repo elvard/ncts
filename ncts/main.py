@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-import sys
 import curses
 import curses.textpad
 import subprocess
 import locale
 import operator as O
-import logging
 from collections import OrderedDict
 
 locale.setlocale(locale.LC_ALL, '')
