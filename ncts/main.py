@@ -92,10 +92,14 @@ class TaskSpoolerGui(object):
                 self.selected_task = self.updown(self.UP)
             elif c == curses.KEY_DOWN:
                 self.selected_task = self.updown(self.DOWN)
+            elif c == self.ESC_KEY:
+                self.remove_highlight()
             elif c in (ord('q'), ord('Q')):
                 break
 
     def updown(self, inc):
+        if not self.selected_task:
+            self.selected_task = 0
         nextLineNum = self.selected_task + inc
 
         return max(1, min(self.max_tasks, nextLineNum))
@@ -114,7 +118,7 @@ class TaskSpoolerGui(object):
         curses.init_pair(7, curses.COLOR_GREEN, curses.COLOR_BLACK)
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_GREEN)
 
-        self.selected_task = 1
+        self.selected_task = None
         self.tsPad = curses.newpad(self.MAX_LINES, 80)
         self.outputPad = curses.newpad(self.MAX_LINES, 80)
 
@@ -145,6 +149,9 @@ class TaskSpoolerGui(object):
         if line_num == self.selected_task:
             color += 1
         return curses.color_pair(color)
+
+    def remove_highlight(self):
+        self.selected_task = None
 
     def exit(self):
         pass
