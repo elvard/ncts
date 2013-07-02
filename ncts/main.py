@@ -78,15 +78,18 @@ class TaskSpoolerGui(object):
 
     def __init__(self, screen):
         self.screen = screen
+        self.screen_width = self.screen_height = 0
+
         self.ts = TaskSpooler()
 
         self.create_layout()
-        self.calculate_dimensions()
         self.run()
 
     def run(self):
         while True:
+            self.calculate_dimensions()
             self.display_screen()
+            self.display_task_output()
 
             c = self.screen.getch()
             if c == curses.KEY_UP:
@@ -107,7 +110,13 @@ class TaskSpoolerGui(object):
 
     def calculate_dimensions(self):
         height, width = self.screen.getmaxyx()
-        self.screen_width = width
+        if height != self.screen_height or width != self.screen_width:
+            curses.resizeterm(height, width)
+        else:
+            return
+
+        self.screen_height, self.screen_width = height, width
+
         self.ts_list_height = max(5, int(0.4 * height))
         self.ts_output_height = max(0, height - self.ts_list_height)
 
@@ -138,6 +147,7 @@ class TaskSpoolerGui(object):
 
     def display_screen(self):
         self.ts.read_task_list()
+        self.max_tasks = len(self.ts.tasks)
 
         self.tsPad.addstr(self.ts.header, curses.A_BOLD)
         max_line = len(self.ts.header)
@@ -148,10 +158,7 @@ class TaskSpoolerGui(object):
             self.tsPad.addstr(y, 0, task['line'], color)
             max_line = max(max_line, len(task['line']))
 
-        self.max_tasks = y
-        self.tsPad.refresh(0, 0, 0, 0, y, self.screen_width)
-
-        self.display_task_output()
+        self.tsPad.refresh(0, 0, 0, 0, self.ts_list_height, self.screen_width - 1)
 
     def display_task_output(self):
         if not self.selected_task:
@@ -168,7 +175,7 @@ class TaskSpoolerGui(object):
                     max_line = max(max_line, len(line))
 
                 self.outputPad.refresh(0, 0, self.ts_list_height + 1,
-                                0, self.ts_output_height, self.screen_width)
+                                0, self.ts_output_height, self.screen_width - 1)
         except IOError:
             return
 
