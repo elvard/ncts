@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import curses
 import curses.textpad
 import functools
@@ -290,5 +289,5 @@ class TaskSpoolerGui(object):
         self.ts.remove_task(task_index)
 
 
-if __name__ == '__main__':
+def main(*args):
     curses.wrapper(TaskSpoolerGui)
